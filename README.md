@@ -2,7 +2,7 @@
 
 This is a stock Nginx container with a very simple configuration file that simply do a reverse proxy of any request to a Docker Swarm service. The service-name is part of the request-url.
 
-Say you have Docker Swarm service named *voldemort*, running on an overlay network. If you start this nginx container, using the same network, and giving it a reachable port, it will forward your request to port 8080 on that service.
+Say you have Docker Swarm service named *voldemort*, running on an overlay network named *api-internal*. If you start a service with this nginx image, using the same network, and give it a reachable port, it will forward your request to port 8080 on that service.
 
 # Background
 
@@ -19,21 +19,33 @@ Basically, we just suck the service-name (which is a dns entry in the overlay ne
 
 In this case the service is running on port 8080, so we forward to that port.
 
-
 # A simple example
 
 In this example I run commands on a node in a Swarm.
 ```sh
-$ docker node ls
-ID                            HOSTNAME            STATUS              AVAILABILITY        MANAGER STATUS      ENGINE VERSION
-x7zxuzg7s4zw5ejlcfu34yfcp *   node-1              Ready               Active              Leader              18.05.0-ce
-khiq4txamdtq4snlf3o87uq37     node-2              Ready               Active                                  18.05.0-ce
-srb6m841oxxh20cwdnfx9pvr1     node-3              Ready               Active                                  18.05.0-ce
+$ docker network create  --driver overlay api-internal
+s8rzqedokarlg5hywv9isyku1
+
+$ docker service create --name voldemort -e SERVICE_NAME=Voldemort --network api-internal --replicas 4 jgaafromnorth/rest-diag-svc
+7og8izi0cu1k276vxeqn24bfw
+overall progress: 4 out of 4 tasks
+1/4: running   [==================================================>]
+2/4: running   [==================================================>]
+3/4: running   [==================================================>]
+4/4: running   [==================================================>]
+
+$ docker service create --name proxy -p 80:80 --network api-internal --replicas 2 jgaafromnorth/nginx-swarm-proxy
+
+overall progress: 2 out of 2 tasks
+1/2: running   [==================================================>]
+2/2: running   [==================================================>]
+verify: Service converged
 
 $ docker service ls
-ID                  NAME                MODE                REPLICAS            IMAGE             PORTS
-c6facpxtpdkb        proxy               replicated          4/4                 proxy:latest      *:80->80/tcp
-eag22u9nwj7q        voldemort           replicated          2/2                 node-api:latest
+ID                  NAME                MODE                REPLICAS            IMAGE                                    PORTS
+oz71x1igkwkz        proxy               replicated          2/2                 jgaafromnorth/nginx-swarm-proxy:latest   *:80->80/tcp
+7og8izi0cu1k        voldemort           replicated          4/4                 jgaafromnorth/rest-diag-svc:latest
+
 ```
 
 And now, let's send a query to voldemort, via the proxy
@@ -42,12 +54,12 @@ And now, let's send a query to voldemort, via the proxy
 $ curl "http://127.0.0.1/proxy/voldemort/search/adversaries?first_name=Harry&last_name=Potter"
 ```
 
-The response in my case, using a service for *voldemort* that just returns diagnostics data:
+The response in my case, using an image for *voldemort* that just returns diagnostics data:
 
 ```json
 {
-    "service": "voldemort",
-    "host": "80935c1fc4e8",
+    "service": "Voldemort",
+    "host": "545e96dc95ad",
     "request": "/search/adversaries?first_name=Harry&last_name=Potter",
     "method": "GET",
     "headers": {
@@ -58,12 +70,11 @@ The response in my case, using a service for *voldemort* that just returns diagn
         "user-agent": "curl/7.54.1",
         "accept": "*/*"
     },
-    "from": "::ffff:10.0.0.32"
+    "from": "::ffff:10.0.0.58"
 }
 ```
 
 # A word of Caution!
 
 My use-case is for services and consumers that run inside a secure environment. The proxies are not receiving any requests from Internet, or even from corporate networks, except for the servers that will consume them. If you deploy this thing in an insecure environment, make sure to harden it so you don't open up an anonymous proxy-server to the Internet (or to your internal network).
-
 
