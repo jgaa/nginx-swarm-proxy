@@ -74,6 +74,14 @@ The response in my case, using an image for *voldemort* that just returns diagno
 }
 ```
 
+# Prebuilt image
+
+An image built from this project's Dockerfile is available from [Docker Hub](https://hub.docker.com/r/jgaafromnorth/nginx-swarm-proxy/)
+
+```sh
+$ docker pull jgaafromnorth/nginx-swarm-proxy
+```
+
 # A word of Caution!
 
 My use-case is for services and consumers that run inside a secure environment. The proxies are not receiving any requests from Internet, or even from corporate networks, except for the servers that will consume them. If you deploy this thing in an insecure environment, make sure to harden it so you don't open up an anonymous proxy-server to the Internet (or to your internal network).
